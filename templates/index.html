@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Attendance Register - TMA</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-image: url('/static/images/machine.jpg');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      color: #fff;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+
+
+    header {
+      background-color: rgba(51, 51, 51, 0.7);
+      padding: 20px;
+    }
+
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: rgba(255, 255, 255, 0.8);
+      border-radius: 10px;
+      color: #000;
+    }
+
+
+    .video-section {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+
+    .status {
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+
+    button {
+      background-color: #3e8e41;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 10px;
+    }
+
+
+    button:disabled {
+      background-color: #aaa;
+    }
+
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      font-size: 16px;
+    }
+
+
+    #canvas {
+      display: none;
+    }
+
+  .face-overlay {
+  position: absolute;
+  border: 3px dashed #00ff00;
+  width: 200px;
+  height: 200px;
+  top: 25px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 10px;
+}
+.video-wrapper {
+  position: relative;
+  display: inline-block;
+}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Attendance Register - TMA</h1>
+  </header>
+
+ 
+  <div id="locationStatus" style="text-align:center; background-color: #fffa; color: #000; padding: 15px; font-size: 18px; font-weight: bold;">
+    Checking your location...
+    
+  </div>  
+  <div class="container">
+    <h2>Welcome to TMA</h2>
+    <p>Please capture your face to mark attendance or register.</p>
+
+
+    <!-- Registration Form Section -->
+    <div id="registrationSection" style="display: none;">
+      <input type="text" id="name" placeholder="Enter your name" />
+      <input type="text" id="surname" placeholder="Enter your surname" />
+      <<div class="video-section">
+        <div class="video-wrapper">
+          <video id="video" width="300" height="250" autoplay></video>
+          <div class="face-overlay"></div>
+        </div>
+      </div>
+      <button id="captureButton">Capture Face</button>
+      <canvas id="canvas"></canvas>
+      <button id="registerButton" disabled>Register Face</button>
+      <p class="status" id="statusMessage">Please capture your face for registration.</p>
+    </div>
+
+
+    <hr />
+
+
+    <!-- Attendance Section -->
+    <div id="attendanceSection">
+      <h3>Mark Your Attendance</h3>
+      <<div class="video-section">
+        <div class="video-wrapper">
+          <video id="attendanceVideo" width="300" height="250" autoplay></video>
+          <div class="face-overlay"></div>
+        </div>      
+      </div>
+      <button id="attendanceButton" disabled>Mark Attendance</button>
+      <p class="status" id="attendanceStatusMessage">
+        Please position yourself in front of the camera to mark attendance.
+      </p>
+    </div>
+
+
+    <!-- Navigation Buttons Section -->
+    <button id="goToAttendanceBtn">Go to Attendance</button>
+    <button id="goToRegistrationBtn">Go to Registration</button>
+  </div>
+
+
+  <script>
+  const captureButton = document.getElementById('captureButton');
+  const registerButton = document.getElementById('registerButton');
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const statusMessage = document.getElementById('statusMessage');
+  const attendanceButton = document.getElementById('attendanceButton');
+  const attendanceVideo = document.getElementById('attendanceVideo');
+  const attendanceStatusMessage = document.getElementById('attendanceStatusMessage');
+  const registrationSection = document.getElementById('registrationSection');
+  const attendanceSection = document.getElementById('attendanceSection');
+  const goToAttendanceBtn = document.getElementById('goToAttendanceBtn');
+  const goToRegistrationBtn = document.getElementById('goToRegistrationBtn');
+
+
+  // Start both webcam feeds
+  navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+    video.srcObject = stream;
+    attendanceVideo.srcObject = stream;
+  });
+
+
+  // Function to restart video feed for registration
+  function startVideoForRegistration() {
+    navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+      video.srcObject = stream;
+    }).catch((err) => console.error("Error starting camera for registration: ", err));
+  }
+
+
+  // Function to restart video feed for attendance
+  function startVideoForAttendance() {
+    navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+      attendanceVideo.srcObject = stream;
+    }).catch((err) => console.error("Error starting camera for attendance: ", err));
+  }
+
+
+  // Navigate to Attendance Section
+  goToAttendanceBtn.addEventListener('click', () => {
+    registrationSection.style.display = 'none';
+    attendanceSection.style.display = 'block';
+    attendanceStatusMessage.textContent = "Please position yourself in front of the camera to mark attendance.";
+    attendanceButton.disabled = true;  // Disable until recognized
+    startVideoForAttendance();  // Ensure video feed starts
+    setTimeout(checkRecognition, 1500);  // Start recognition
+  });
+
+
+  // Navigate to Registration Section
+  goToRegistrationBtn.addEventListener('click', () => {
+    attendanceSection.style.display = 'none';
+    registrationSection.style.display = 'block';
+    statusMessage.textContent = "Please capture your face for registration.";
+    registerButton.disabled = true;  // Disable until captured
+    startVideoForRegistration();  // Ensure video feed starts
+  });
+
+
+  // Capture face image for registration
+  captureButton.addEventListener('click', () => {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    registerButton.disabled = false;
+    statusMessage.textContent = "Face captured. Now click 'Register Face'.";
+  });
+
+
+  // Register face for the first time
+  registerButton.addEventListener('click', () => {
+    const name = document.getElementById('name').value;
+    const surname = document.getElementById('surname').value;
+
+
+    if (!name || !surname) {
+      alert("Please enter both name and surname.");
+      return;
+    }
+
+
+    const imageDataUrl = canvas.toDataURL('image/jpeg');
+
+
+    fetch('/register_face', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `image=${encodeURIComponent(imageDataUrl)}&name=${encodeURIComponent(name)}&surname=${encodeURIComponent(surname)}`
+    })
+    .then((response) => response.json())
+    .then((data) => {
+      alert(data.message);
+      if (data.status === "success") {
+        registrationSection.style.display = 'none';
+        attendanceSection.style.display = 'block';
+        setTimeout(checkRecognition, 1500);
+      }
+    })
+    .catch((error) => {
+      console.error("Error during registration:", error);
+      alert("Error occurred during registration.");
+    });
+  });
+
+
+  // Retry logic for recognizing face
+  let retryCount = 0;
+  const maxRetries = 3;
+  const retryDelay = 1500;  // Delay for retries (1.5 seconds between each)
+
+
+  function checkRecognition() {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = attendanceVideo.videoWidth;
+    canvas.height = attendanceVideo.videoHeight;
+    ctx.drawImage(attendanceVideo, 0, 0, canvas.width, canvas.height);
+    const imageDataUrl = canvas.toDataURL('image/jpeg');
+
+
+    fetch('/recognize_face', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `image=${encodeURIComponent(imageDataUrl)}`
+    })
+    .then((response) => response.json())
+    .then((data) => {
+      if (data.status === "success" && data.match) {
+        attendanceStatusMessage.textContent = `Welcome, ${data.name}! You can now mark your attendance.`;
+        attendanceButton.disabled = false;
+      } else {
+        if (retryCount < maxRetries) {
+          retryCount++;
+          attendanceStatusMessage.textContent = "Face not recognized. Retrying...";
+
+
+          setTimeout(() => {
+            checkRecognition();  // Retry recognition
+          }, retryDelay);
+        } else {
+          attendanceStatusMessage.textContent = "Face not recognized. Please register.";
+          attendanceButton.disabled = true;
+          registrationSection.style.display = 'block';
+          attendanceSection.style.display = 'none';
+        }
+      }
+    })
+    .catch((error) => {
+      console.error("Error checking recognition:", error);
+    });
+  }
+
+  // Workplace Coordinates
+const workplaceLat = -26.103890553436912;
+const workplaceLng = 28.053222937961696;
+const allowedDistance = 0.1; // in kilometers (100 meters)
+
+// Convert degrees to radians
+function toRad(value) {
+  return value * Math.PI / 180;
+}
+
+// Haversine formula to calculate distance between two coordinates
+function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Radius of earth in KM
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Disable everything if not at workplace
+function disableUIWithMessage(message) {
+  document.querySelector('.container').innerHTML = `
+    <h2>Access Denied</h2>
+    <p>${message}</p>
+  `;
+}
+
+// Check user's location
+function checkLocationAndContinue() {
+  const statusDiv = document.getElementById('locationStatus');
+  statusDiv.textContent = "Checking your location...";
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition((position) => {
+      const userLat = position.coords.latitude;
+      const userLng = position.coords.longitude;
+      const distance = getDistanceFromLatLonInKm(userLat, userLng, workplaceLat, workplaceLng);
+      console.log("Distance to workplace:", distance, "km");
+
+      if (distance <= allowedDistance) {
+        statusDiv.textContent = "✅ You are at the workplace. You may continue.";
+        initApp(); // allow app to continue
+      } else {
+        statusDiv.textContent = "❌ You are not at the workplace. Attendance features are disabled.";
+        disableUIWithMessage("You are not at the workplace. Please go to the TMA office to mark attendance.");
+      }
+    }, (error) => {
+      statusDiv.textContent = "⚠️ Unable to get your location.";
+      disableUIWithMessage("Unable to retrieve location. Please enable location services.");
+    });
+  } else {
+    statusDiv.textContent = "⚠️ Geolocation not supported.";
+    disableUIWithMessage("Geolocation is not supported by this browser.");
+  }
+}
+
+function initApp() {
+  startVideoForAttendance();
+  setTimeout(checkRecognition, 1500);  // Delay to allow for camera setup
+}
+
+  // Call this function automatically when the page loads
+  window.onload = function() {
+  checkLocationAndContinue();
+};
+
+
+
+  // Function to mark attendance when the button is clicked
+  attendanceButton.addEventListener('click', () => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = attendanceVideo.videoWidth;
+    canvas.height = attendanceVideo.videoHeight;
+    ctx.drawImage(attendanceVideo, 0, 0, canvas.width, canvas.height);
+    const imageDataUrl = canvas.toDataURL('image/jpeg');
+
+
+    fetch('/mark_attendance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `image=${encodeURIComponent(imageDataUrl)}`
+    })
+    .then((response) => response.json())
+    .then((data) => {
+      if (data.status === "success") {
+        alert("Attendance marked successfully!");
+        // Optionally, show a confirmation message and reset the UI
+        attendanceStatusMessage.textContent = "Attendance marked. Thank you!";
+      } else {
+        alert("Error marking attendance. Please try again.");
+      }
+    })
+    .catch((error) => {
+      console.error("Error marking attendance:", error);
+      alert("Error occurred while marking attendance.");
+    });
+  });
+</script>
+
+
+
+
+</body>
+</html>
